@@ -29,6 +29,7 @@ data Instr = Assign Vars AExpr -- assignment
     | Do [Instr] -- a block of several instructions
     | Nop -- the "do nothing" instruction
     | Return AExpr -- the final value to return
+    | FCall FName [Value]
     deriving Show
 
 
@@ -56,7 +57,7 @@ data Token = VSym String | CSym Integer | BSym Bool
 --FUNCTIONS, CLASSES 
 
 type VName = String 
-type Value = Integer
+type Value = Either Integer Bool
 type VEnv = [(VName, Value)] 
 type FEnv = [(FName, [(VName, Instr)])]
 
@@ -75,6 +76,7 @@ data FunDef = FunDef { fname :: FName
 -- Params have a value and a name, VEnv
 --
 --FunDef is function definition. Value is values to be put in original params
+
 --evalFunDef :: FunDef -> [Value] -> Either AExpr BExpr
 --evalFunDef = 
 
@@ -128,15 +130,14 @@ exec (While condI doI) env =
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
 exec Nop env = env
+-- exec (FCall n vs) = helper n vs
 exec (Return a) env = update ("", evala env a) env 
+
+--helper :: FName -> [Value] -> Env
+--helper 
 
 execList :: [Instr] -> Env -> Env
 execList instrs env = foldl (\e i -> exec i e) env instrs
-
-run :: [Instr] -> Integer
-run p = case lookup "" (execList p []) of
-    Just x -> x
-    Nothing -> error "No value returned."
  
 --Example
 sum100 :: [Instr] -- a program to add together all the numbers up to 100
@@ -196,9 +197,8 @@ lexer (x:xs) | isLower x = let (ys,zs) = span isAlphaNum xs in VSym (x:ys) : lex
 lexer (x:xs) | isUpper x = let (ys,zs) = span isAlphaNum xs in NSym (x:ys) : lexer zs       --function names 
 lexer xs                 = [Err xs]
 
-
-readProg :: [Token] -> Either [Instr] String
-readProg tokens = case sr [] tokens of
+parse :: [Token] -> Either [Instr] String
+parse tokens = case sr [] tokens of
     (Block instructions : []) -> Left instructions
     (Err e : _) -> Right ("Lexical Error: " ++ e)
     _ -> Right "Parse Error: Invalid program structure"
@@ -265,6 +265,11 @@ blocker (x:xs) (Block(i):[]) = case x of
     _ -> [Err "Block Error"]
 
 
+run :: [Instr] -> Integer
+run p = case lookup "" (execList p []) of
+    Just x -> x
+    Nothing -> error "No value returned."
+
 
 rank :: BOps -> Int
 rank AddOp = 1
@@ -284,7 +289,7 @@ repl = do
     contents <- readFile fileName
     case contents of 
         "quit" -> return () 
-        s -> case readProg (lexer contents) of 
+        s -> case parse (lexer contents) of 
             Left expr -> putStrLn ("Evaluates to: " ++ show (run expr))
             Right err -> putStrLn err
         
