@@ -29,7 +29,7 @@ data Instr = Assign Vars AExpr -- assignment
     | Return AExpr -- the final value to return
     deriving Show
 
-    
+
 data Keywords = IfK | ThenK | ElseK | WhileK | NopK | ReturnK 
     | ClassK | MainK | IntegerK | BooleanK | NewK | 
     FunK | PublicK | PrivateK
@@ -47,7 +47,7 @@ data Token = VSym String | CSym Integer | BSym Bool
     | Err String
     | PA AExpr | PB BExpr | PI Instr | Block [Instr]
     | Params [(VName, Value)] 
-    | FunCall [Instr]
+    | FunDef [Instr]
     deriving Show
 
 
@@ -223,7 +223,7 @@ sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
 sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
     --Function 
---sr (Semi : RBra : Block i : LBra : Params l : NSym : ts) = sr (FunCall (Do (reverse i)) : Params l : Keyword NSym : ts) q   
+--sr (Semi : RBra : Block i : LBra : Params l : NSym : ts) = sr (FunDef (Do (reverse i)) : Params l : Keyword NSym : ts) q   
  --Return
 
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
@@ -272,3 +272,67 @@ repl = do
         
         
 
+{-
+adding structures to imp
+various fields 
+different types, some of those fields are functions 
+
+
+replace parseline with parsefundef in parselines 
+parselines returns Fname 
+
+Use records 
+FEnv = (Fname, ([Vars], AExpr))
+instead: 
+data FunDef = FunDef { fname :: FName 
+                        , cars :: [Vars]
+                        , body :: AExpr  }
+
+
+lookupfun :: FName -> FunDef -> Maybe FunDef 
+lookupFun fn [] = Nothing
+lookupFun fn (fd : fdr) = if fname fd == fn then Just fc else lookupFun fn fds
+
+replace lookup with lookupFun in eval 
+Fust fundef -> 
+        new env = zip (vars, fundef) 
+        in eval (newEnv, fenv) (body fundef) 
+
+
+parsefunDef :: [Token] -> FunDef 
+now outputs fundef fn (left)
+
+(parselines ->)
+parseFunDefs
+-}
+
+
+
+{-
+Changing from AEzpr to a list of instructions 
+    in the function call don't return the evaluation
+    create a function that executes the body of the function with the list of parameters 
+ex: 
+    execFun :: [Instr] -> FunDef-> Value 
+    then in eval: 
+        in execFun (boody fundef) (newEnc, fenv) execFun ()
+
+
+
+lexer: 
+lex function definition into Tokens 
+
+parser:
+parse function definition into record 
+
+data TOken = ... | AccessT | InputVars [Vars] | FunDefT FunDef
+data AccessT = PrivateK | PublicK 
+sr (LPar : Nsym : AccessToken : s ) q = (InputVars [] : AccessT : s) q
+sr (Comma : VSym x : InputVars xs : s) q = sr (InputVars (x:xs) : s) q
+sr (RPar : VSym x : InputVars xs : s) q = sr (InputVars (x:xs) : s) q
+sr (LBra : InputVars xs: s) q = ... 
+sr(Rbra : Do is : (Lbra?) : InputVars xs : NSym f : AccessT : s) q = sr (FunDefT (FunDef {fname = f, vars = (reverse xs), body = reverse (is)}) : s) q
+
+eval: 
+evaluate record-  call a helper to evaluate the function definition, get a return value from the function 
+-}
