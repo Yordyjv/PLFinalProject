@@ -1,0 +1,11 @@
+x:=17;
+d:=3;
+
+
+if (x <= d)
+    then d:=x
+    else while (d < x) {
+        d:=(d+x);
+        x:=(x+4);
+    } ; 
+return d;
