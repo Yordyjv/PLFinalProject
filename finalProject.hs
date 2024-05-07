@@ -4,12 +4,15 @@ import Control.Monad.RWS (MonadState(put))
 --Worked with Kevin Portillo
 
 type FunList = Either AExpr BExpr 
+type FName = String  --Function names 
 
 type Vars = String -- Variables
+
 data AExpr = Var Vars | Const Integer -- Arithmetic expressions
     | Add AExpr AExpr | Sub AExpr AExpr
     | Mul AExpr AExpr | Div AExpr AExpr
-    | Mod AExpr |  FCall [FunList]
+    | Mod AExpr 
+    | FCallA AExpr --returns the evaluated function 
     deriving Show
 data BExpr = TT | FF -- Boolean expressions
     | And BExpr BExpr | Or BExpr BExpr | Not BExpr
@@ -17,6 +20,7 @@ data BExpr = TT | FF -- Boolean expressions
     | Lt AExpr AExpr -- true if the first is less than the second
     | Lte AExpr AExpr -- true if it’s less than or equal to
     | Gre BExpr BExpr | Gr BExpr BExpr --NEW
+    | FCallB BExpr --returns the evaluated function 
     deriving Show
 
 data Instr = Assign Vars AExpr -- assignment
@@ -25,9 +29,60 @@ data Instr = Assign Vars AExpr -- assignment
     | Do [Instr] -- a block of several instructions
     | Nop -- the "do nothing" instruction
     | Return AExpr -- the final value to return
+    | FCall FName [Value]
     deriving Show
 
+
+data Keywords = IfK | ThenK | ElseK | WhileK | NopK | ReturnK 
+    | ClassK | MainK | IntegerK | BooleanK | NewK | 
+    FunK | PublicK | PrivateK
+    deriving Show
+data UOps = NotOp deriving Show 
+data BOps = AddOp | SubOp | MulOp | DivOp
+    | AndOp | OrOp | EqlOp | LtOp | LteOp
+    | ModOp | GreOp | GrOp
+    deriving Show
+data Token = VSym String | CSym Integer | BSym Bool
+    | NSym String --Starts with uppercase letter, followed by 0 or more letters/digits
+    | LPar | RPar | LBra | RBra | Semi
+    | UOp UOps | BOp BOps | AssignOp
+    | Keyword Keywords
+    | Err String
+    | PA AExpr | PB BExpr | PI Instr | Block [Instr]
+    | Params [VName] 
+    | FunDefT FunDef
+    deriving Show
+
+
+--FUNCTIONS, CLASSES 
+
+type VName = String 
+type Value = Either Integer Bool
+type VEnv = [(VName, Value)] 
+type FEnv = [(FName, [(VName, Instr)])]
+
+type ClassName = String 
+type Class = (VEnv, FEnv) 
+type Object = [(ClassName, Class)] 
+
 type Env = [(Vars,Integer)]
+
+data FunDef = FunDef { fname :: FName 
+                        , params :: [Vars]
+                        , body :: [Instr]  }
+                        deriving Show
+
+-- Fun def has params and body. 
+-- Params have a value and a name, VEnv
+--
+--FunDef is function definition. Value is values to be put in original params
+
+--evalFunDef :: FunDef -> [Value] -> Either AExpr BExpr
+--evalFunDef = 
+
+
+
+
 
 -- update (x,v) e sets the value of x to v and keeps other variables in e the same
 update :: (Vars, Integer) -> Env -> Env
@@ -75,15 +130,14 @@ exec (While condI doI) env =
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
 exec Nop env = env
+-- exec (FCall n vs) = helper n vs
 exec (Return a) env = update ("", evala env a) env 
+
+--helper :: FName -> [Value] -> Env
+--helper 
 
 execList :: [Instr] -> Env -> Env
 execList instrs env = foldl (\e i -> exec i e) env instrs
-
-run :: [Instr] -> Integer
-run p = case lookup "" (execList p []) of
-    Just x -> x
-    Nothing -> error "No value returned."
  
 --Example
 sum100 :: [Instr] -- a program to add together all the numbers up to 100
@@ -96,37 +150,6 @@ sum100 = [
     Return (Var "X")]
 
 sum100output = run sum100
-
-
-
-data Keywords = IfK | ThenK | ElseK | WhileK | NopK | ReturnK 
-    | ClassK | MainK | VoidK | IntegerK | BooleanK | NewK  
-    deriving Show
-data UOps = NotOp deriving Show
-data BOps = AddOp | SubOp | MulOp | DivOp
-    | AndOp | OrOp | EqlOp | LtOp | LteOp
-    | ModOp | GreOp | GrOp
-    deriving Show
-data Token = VSym String | CSym Integer | BSym Bool
-    | LPar | RPar | LBra | RBra | Semi
-    | UOp UOps | BOp BOps | AssignOp
-    | Keyword Keywords
-    | Err String
-    | PA AExpr | PB BExpr | PI Instr | Block [Instr]
-    deriving Show
-
-
---FUNCTIONS, CLASSES 
-type FName = String
-
-type VName = String 
-type Value = String 
-type VEnv = [(VName, Value)] 
-type FEnv = [(FName, [(VName, Instr)])]
-
-type ClassName = String 
-type Class = (VEnv, FEnv) 
-type Object = [(ClassName, Class)] 
 
 
 lexer :: String -> [Token]
@@ -147,6 +170,13 @@ lexer ('t':'h':'e':'n':xs)          = Keyword ThenK : lexer xs
 lexer ('e':'l':'s':'e':xs)          = Keyword ElseK : lexer xs
 lexer ('n':'o':'p':xs)              = Keyword NopK : lexer xs
 lexer ('r':'e':'t':'u':'r':'n':xs)  = Keyword ReturnK : lexer xs
+--Classes & functions  
+lexer ('C':'l':'a':'s':'s':xs)      = Keyword ClassK : lexer xs --class
+lexer ('m':'a':'i':'n':xs)          = Keyword MainK : lexer xs  --main
+lexer ('p':'u':'b':'l':'i':'c':xs)      = Keyword PublicK : lexer xs    --public function
+lexer ('p':'r':'i':'v':'a':'t':'e':xs)      = Keyword PrivateK : lexer xs --private function
+lexer ('i':'n':'t':xs)                     =Keyword IntegerK : lexer xs --int return type
+lexer ('b':'o':'o':'l':'e':'a':'n':xs) = Keyword BooleanK : lexer xs --boolean return type 
 --Variables
 --Operators
 lexer ('+':xs)          = BOp AddOp : lexer xs
@@ -161,14 +191,14 @@ lexer ('<':'=':xs)          = BOp LteOp : lexer xs
 lexer ('<':xs)              = BOp LtOp : lexer xs
 lexer (':':'=':xs)          = AssignOp : lexer xs
 --space
-lexer (x:xs) | isSpace x = lexer xs
-lexer (x:xs) | isDigit x = let (ys,zs) = span isDigit xs    in CSym (read (x:ys)) : lexer zs
-lexer (x:xs) | isLower x = let (ys,zs) = span isAlphaNum xs in VSym (x:ys) : lexer zs
+lexer (x:xs) | isSpace x = lexer xs --space
+lexer (x:xs) | isDigit x = let (ys,zs) = span isDigit xs    in CSym (read (x:ys)) : lexer zs --number
+lexer (x:xs) | isLower x = let (ys,zs) = span isAlphaNum xs in VSym (x:ys) : lexer zs       --variable name
+lexer (x:xs) | isUpper x = let (ys,zs) = span isAlphaNum xs in NSym (x:ys) : lexer zs       --function names 
 lexer xs                 = [Err xs]
 
-
-readProg :: [Token] -> Either [Instr] String
-readProg tokens = case sr [] tokens of
+parse :: [Token] -> Either [Instr] String
+parse tokens = case sr [] tokens of
     (Block instructions : []) -> Left instructions
     (Err e : _) -> Right ("Lexical Error: " ++ e)
     _ -> Right "Parse Error: Invalid program structure"
@@ -210,8 +240,10 @@ sr (LBra: ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
 sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
+    --Function 
+--sr (Semi : RBra : Block i : LBra : Params l : NSym : ts) = sr (FunDef (Do (reverse i)) : Params l : Keyword NSym : ts) q   
+ --Return
 
-    --Return
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
 
     --Syntax
@@ -233,6 +265,11 @@ blocker (x:xs) (Block(i):[]) = case x of
     _ -> [Err "Block Error"]
 
 
+run :: [Instr] -> Integer
+run p = case lookup "" (execList p []) of
+    Just x -> x
+    Nothing -> error "No value returned."
+
 
 rank :: BOps -> Int
 rank AddOp = 1
@@ -252,9 +289,73 @@ repl = do
     contents <- readFile fileName
     case contents of 
         "quit" -> return () 
-        s -> case readProg (lexer contents) of 
+        s -> case parse (lexer contents) of 
             Left expr -> putStrLn ("Evaluates to: " ++ show (run expr))
             Right err -> putStrLn err
         
         
 
+{-
+adding structures to imp
+various fields 
+different types, some of those fields are functions 
+
+
+replace parseline with parsefundef in parselines 
+parselines returns Fname 
+
+Use records 
+FEnv = (Fname, ([Vars], AExpr))
+instead: 
+data FunDef = FunDef { fname :: FName 
+                        , cars :: [Vars]
+                        , body :: AExpr  }
+
+
+lookupfun :: FName -> FunDef -> Maybe FunDef 
+lookupFun fn [] = Nothing
+lookupFun fn (fd : fdr) = if fname fd == fn then Just fc else lookupFun fn fds
+
+replace lookup with lookupFun in eval 
+Fust fundef -> 
+        new env = zip (vars, fundef) 
+        in eval (newEnv, fenv) (body fundef) 
+
+
+parsefunDef :: [Token] -> FunDef 
+now outputs fundef fn (left)
+
+(parselines ->)
+parseFunDefs
+-}
+
+
+
+{-
+Changing from AEzpr to a list of instructions 
+    in the function call don't return the evaluation
+    create a function that executes the body of the function with the list of parameters 
+ex: 
+    execFun :: [Instr] -> FunDef-> Value 
+    then in eval: 
+        in execFun (boody fundef) (newEnc, fenv) execFun ()
+
+
+
+lexer: 
+lex function definition into Tokens 
+
+parser:
+parse function definition into record 
+
+data TOken = ... | AccessT | InputVars [Vars] | FunDefT FunDef
+data AccessT = PrivateK | PublicK 
+sr (LPar : Nsym : AccessToken : s ) q = (InputVars [] : AccessT : s) q
+sr (Comma : VSym x : InputVars xs : s) q = sr (InputVars (x:xs) : s) q
+sr (RPar : VSym x : InputVars xs : s) q = sr (InputVars (x:xs) : s) q
+sr (LBra : InputVars xs: s) q = ... 
+sr(Rbra : Do is : (Lbra?) : InputVars xs : NSym f : AccessT : s) q = sr (FunDefT (FunDef {fname = f, vars = (reverse xs), body = reverse (is)}) : s) q
+
+eval: 
+evaluate record-  call a helper to evaluate the function definition, get a return value from the function 
+-}
