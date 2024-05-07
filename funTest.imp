@@ -1,0 +1,16 @@
+public int Bruh(x,y){
+    x+y;
+
+}
+
+main{
+   return Bruh(4,4);
+}
+
+
+
+publick interk funk nsym"bruh" Lbra vym x addop vsym y
+
+FunDefT fundef(name, params, block[vysm uop addop vysm y])
+
+block[Fcall bruh (4,4)]

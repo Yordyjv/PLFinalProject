@@ -28,6 +28,7 @@ data Instr = Assign Vars AExpr -- assignment
     | While BExpr Instr -- looping construct
     | Do [Instr] -- a block of several instructions
     | Nop -- the "do nothing" instruction
+    | FAssign FunDef
     | Return AExpr -- the final value to return
     | FCall FName [Value]
     deriving Show
@@ -58,17 +59,18 @@ data Token = VSym String | CSym Integer | BSym Bool
 
 type VName = String 
 type Value = Either Integer Bool
-type VEnv = [(VName, Value)] 
-type FEnv = [(FName, [(VName, Instr)])]
+type VEnv = [(VName, Value)] --fields
 
-type ClassName = String 
-type Class = (VEnv, FEnv) 
-type Object = [(ClassName, Class)] 
+type FEnv = [FunDef] -- fundefs
 
-type Env = [(Vars,Integer)]
+type Env = (VEnv, FEnv) --class enviorments
+
+--type ClassName = String 
+--type Object = [(ClassName, Class)] 
+
 
 data FunDef = FunDef { fname :: FName 
-                        , params :: [Vars]
+                        , params :: VEnv
                         , body :: [Instr]  }
                         deriving Show
 
@@ -85,17 +87,20 @@ data FunDef = FunDef { fname :: FName
 
 
 -- update (x,v) e sets the value of x to v and keeps other variables in e the same
-update :: (Vars, Integer) -> Env -> Env
-update (x, v) [] = [(x, v)]
-update (x, v) ((e, val):env)
-    | x /= e    = (e, val) : update (x, v) env
+updateV :: (Vars, Integer) -> VEnv -> VEnv
+updateV (x, v) [] = [(x, v),[]]
+updateV (x, v) ((e, val):env,[])
+    | x /= e    = (e, val) : updateV (x, v) env
     | otherwise = (x, v) : env
 
 
+
+
+
 evala :: Env -> AExpr -> Integer
-evala env (Var v) = case lookup v env of 
-                Just val -> val
-                Nothing -> error $ "Variable Not Found" ++ v
+evala (venv,fenv) (Var x) = case lookup x venv of
+                     Just val -> val
+                     Nothing  -> error $ "Variable not found: " ++ x
 evala env (Const b) = b
 evala env (Add e1 e2) = evala env e1 + evala env e2
 evala env (Sub e1 e2) = evala env e1 - evala env e2
@@ -119,7 +124,8 @@ evalb env (Lte p1 p2)
     | otherwise = evalb env FF
 
 exec :: Instr -> Env -> Env
-exec (Assign v a) env = update (v, evala env a) env
+exec (Assign v a) env = updateV (v, evala (env a)) fst env
+exec (FAssign fundef) (venv,fenv) = (venv, fundef:fenv)
 exec (IfThenElse condI thenI elseI) env =
     if evalb env condI
         then exec thenI env
@@ -130,15 +136,34 @@ exec (While condI doI) env =
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
 exec Nop env = env
--- exec (FCall n vs) = helper n vs
+
+-- exec (FCall n vs) env = setParms n vs env 
 exec (Return a) env = update ("", evala env a) env 
 
---helper :: FName -> [Value] -> Env
---helper 
+setParms :: FName -> [Value] -> Env -> Env
+setParms fn vs env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
+    Just fundef -> 
+        let newFundef = fundef { params = (zip (params fundef) vs) }
+            newFenv = (fn, newFundef) : filter ((/= fn) . fname . snd) fenv
+        in (venv, newFenv)
+    Nothing -> env
+
+callFun :: FName -> Env -> Env
+callFun fn env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
+    Just fundef ->  execList fundef.body (fundef.params,fenv)
+    Nothing -> env
+
+
+--lokup the function in fenv of env
+--then map [values] to [var(strs)] output [(vars,values)]
+
 
 execList :: [Instr] -> Env -> Env
 execList instrs env = foldl (\e i -> exec i e) env instrs
- 
+
+
+
+
 --Example
 sum100 :: [Instr] -- a program to add together all the numbers up to 100
 sum100 = [
@@ -242,6 +267,7 @@ sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse 
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
     --Function 
 --sr (Semi : RBra : Block i : LBra : Params l : NSym : ts) = sr (FunDef (Do (reverse i)) : Params l : Keyword NSym : ts) q   
+--instead of tuurning it into a fundeft turn it into a n fassing PI.
  --Return
 
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
@@ -263,6 +289,7 @@ blocker (x:xs) (Block(i):[]) = case x of
     Semi -> blocker xs (Block(i):[])
     PI x -> blocker xs (Block(x:i):[])
     _ -> [Err "Block Error"]
+
 
 
 run :: [Instr] -> Integer
