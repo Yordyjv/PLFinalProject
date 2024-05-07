@@ -11,7 +11,8 @@ type Vars = String -- Variables
 data AExpr = Var Vars | Const Integer -- Arithmetic expressions
     | Add AExpr AExpr | Sub AExpr AExpr
     | Mul AExpr AExpr | Div AExpr AExpr
-    | Mod AExpr |  FCall FName
+    | Mod AExpr 
+    | FCallA AExpr --returns the evaluated function 
     deriving Show
 data BExpr = TT | FF -- Boolean expressions
     | And BExpr BExpr | Or BExpr BExpr | Not BExpr
@@ -19,6 +20,7 @@ data BExpr = TT | FF -- Boolean expressions
     | Lt AExpr AExpr -- true if the first is less than the second
     | Lte AExpr AExpr -- true if it’s less than or equal to
     | Gre BExpr BExpr | Gr BExpr BExpr --NEW
+    | FCallB BExpr --returns the evaluated function 
     deriving Show
 
 data Instr = Assign Vars AExpr -- assignment
@@ -46,8 +48,8 @@ data Token = VSym String | CSym Integer | BSym Bool
     | Keyword Keywords
     | Err String
     | PA AExpr | PB BExpr | PI Instr | Block [Instr]
-    | Params [(VName, Value)] 
-    | FunDef [Instr]
+    | Params [VName] 
+    | FunDefT FunDef
     deriving Show
 
 
@@ -63,6 +65,22 @@ type Class = (VEnv, FEnv)
 type Object = [(ClassName, Class)] 
 
 type Env = [(Vars,Integer)]
+
+data FunDef = FunDef { fname :: FName 
+                        , params :: [Vars]
+                        , body :: [Instr]  }
+                        deriving Show
+
+-- Fun def has params and body. 
+-- Params have a value and a name, VEnv
+--
+--FunDef is function definition. Value is values to be put in original params
+--evalFunDef :: FunDef -> [Value] -> Either AExpr BExpr
+--evalFunDef = 
+
+
+
+
 
 -- update (x,v) e sets the value of x to v and keeps other variables in e the same
 update :: (Vars, Integer) -> Env -> Env
