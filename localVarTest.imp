@@ -1,7 +1,11 @@
+z:=3;
+q:=17;
+r:=1;
 
 Bruh(x, d,y){
+g:=15;
 if (x <= d)
-    then d:=x;
+    then d:=(x+1+g);
     else while (d < x) {
         d:=(d+x);
         x:=(x+4);
@@ -10,8 +14,5 @@ if (x <= d)
 return d;
 }
 
-z:=17;
-q:=3;
-r:=1;
 
-Bruh[z,q,r];
+Bruh[z,q,r]; -- should eval to 19 cuz 3+1+15

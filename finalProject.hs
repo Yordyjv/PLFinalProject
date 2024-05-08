@@ -2,66 +2,12 @@ import Data.Char
 import Language.Haskell.TH (safe)
 import Control.Monad.RWS (MonadState(put))
 import Data.Maybe (fromMaybe)
+import System.Directory
+import System.FilePath
 --Worked with Kevin Portillo
 --Funtions are always Camel Case
 --fucntion defintions start with fname (params sep by commas)
 --functions calls are fname [input vars split by commas]
-
-
-
-type FunList = Either AExpr BExpr 
-type FName = String  --Function names 
-
-type Vars = String -- Variables
-
-data AExpr = Var Vars | Const Integer -- Arithmetic expressions
-    | Add AExpr AExpr | Sub AExpr AExpr
-    | Mul AExpr AExpr | Div AExpr AExpr
-    | Mod AExpr 
-    | FCallA AExpr --returns the evaluated function 
-    deriving Show
-data BExpr = TT | FF -- Boolean expressions
-    | And BExpr BExpr | Or BExpr BExpr | Not BExpr
-    | Eql AExpr AExpr -- equality of arithmetic expressions
-    | Lt AExpr AExpr -- true if the first is less than the second
-    | Lte AExpr AExpr -- true if it’s less than or equal to
-    | Gre BExpr BExpr | Gr BExpr BExpr --NEW
-    | FCallB BExpr --returns the evaluated function 
-    deriving Show
-
-data Instr = Assign Vars AExpr -- assignment
-    | IfThenElse BExpr Instr Instr -- conditional
-    | While BExpr Instr -- looping construct
-    | Do [Instr] -- a block of several instructions
-    | Nop -- the "do nothing" instruction
-    | FAssign FunDef
-    | Return AExpr -- the final value to return
-    | FCall FName [Either VName Value] 
-    deriving Show
-
-
-data Keywords = IfK | ThenK | ElseK | WhileK | NopK | ReturnK 
-    | ClassK | MainK | IntegerK | BooleanK | NewK | 
-    FunK | PublicK | PrivateK
-    deriving Show
-data UOps = NotOp deriving Show 
-data BOps = AddOp | SubOp | MulOp | DivOp
-    | AndOp | OrOp | EqlOp | LtOp | LteOp
-    | ModOp | GreOp | GrOp
-    deriving Show
-
-data Token = VSym String | CSym Integer | BSym Bool
-    | NSym String --Starts with uppercase letter, followed by 0 or more letters/digits
-    | LPar | RPar | LBra | RBra | Semi | Comma
-    | UOp UOps | BOp BOps | AssignOp
-    | Keyword Keywords
-    | Err String
-    | LSqu | RSqu
-    | PA AExpr | PB BExpr | PI Instr | Block [Instr] | Input Value | Param VName
-    | Params [VName] | Inputs[Either VName Value] --inputs that are straight constants
-    | FunDefT FunDef
-    deriving Show
-
 
 --FUNCTIONS, CLASSES 
 
@@ -79,6 +25,67 @@ data FunDef = FunDef { fname :: FName
                         , params :: VEnv
                         , body :: [Instr]  }
                         deriving Show
+
+
+data Arg = VarArg VName | ValArg Value | FunArg (FName, [Arg])
+    deriving Show
+
+
+-----
+data Keywords = IfK | ThenK | ElseK | WhileK | NopK | ReturnK 
+    | ClassK | MainK | IntegerK | BooleanK | NewK | 
+    FunK | PublicK | PrivateK
+    deriving Show
+data UOps = NotOp deriving Show 
+data BOps = AddOp | SubOp | MulOp | DivOp
+    | AndOp | OrOp | EqlOp | LtOp | LteOp
+    | ModOp | GreOp | GrOp
+    deriving Show
+-- lexing stuff ^^
+
+
+type FName = String  --Function names 
+type Vars = String -- Variables
+
+data AExpr = Var Vars | Const Integer -- Arithmetic expressions
+    | Add AExpr AExpr | Sub AExpr AExpr
+    | Mul AExpr AExpr | Div AExpr AExpr
+    | Mod AExpr 
+    | FCallA AExpr --returns the evaluated function 
+    deriving Show
+data BExpr = TT | FF -- Boolean expressions
+    | And BExpr BExpr | Or BExpr BExpr | Not BExpr
+    | Eql AExpr AExpr -- equality of arithmetic expressions
+    | Lt AExpr AExpr -- true if the first is less than the second
+    | Lte AExpr AExpr -- true if it’s less than or equal to
+    | Gre BExpr BExpr | Gr BExpr BExpr --NEW
+    | FCallB BExpr --returns the evaluated function 
+    deriving Show
+
+
+
+data Instr = Assign Vars AExpr -- assignment
+    | IfThenElse BExpr Instr Instr -- conditional
+    | While BExpr Instr -- looping construct
+    | Do [Instr] -- a block of several instructions
+    | Nop -- the "do nothing" instruction
+    | FAssign FunDef
+    | Return AExpr -- the final value to return
+    | FCall FName [Arg] 
+    deriving Show
+
+data Token = VSym String | CSym Integer | BSym Bool
+    | NSym String --Starts with uppercase letter, followed by 0 or more letters/digits
+    | LPar | RPar | LBra | RBra | Semi | Comma
+    | UOp UOps | BOp BOps | AssignOp
+    | Keyword Keywords
+    | Err String
+    | LSqu | RSqu
+    | PA AExpr | PB BExpr | PI Instr | Block [Instr] 
+    | Params [VName] | Inputs [Arg] --inputs that are straight constants
+    | FunDefT FunDef
+    deriving Show
+
 
 --for full OOP functionallity we would ddefine  the following
 {-
@@ -159,20 +166,22 @@ execList :: [Instr] -> Env -> Env
 execList instrs env = foldl (\e i -> exec i e) env instrs
 
 
-setParms :: FName -> [Either VName Value] -> Env -> Env
-setParms fn evs env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
+setParms :: FName -> [Arg] -> Env -> Env
+setParms fn args env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
     Just fundef -> 
         let varnames = map fst (params fundef)
-            resolvedVs = map (resolveArg env) evs
+            resolvedVs = map (resolveArg env) args
             newparams = zip varnames resolvedVs
             newFundef = fundef { params = newparams }
             newFenv = map (\f -> if fname f == fn then newFundef else f) fenv
         in (venv, newFenv)
     Nothing -> env
 
-resolveArg :: Env -> Either VName Value -> Value
-resolveArg env (Left v) = fromMaybe (error $ "Undefined variable: " ++ v) (lookup v (fst env))
-resolveArg _ (Right val) = val
+resolveArg :: Env -> Arg -> Value
+resolveArg env (VarArg v) = fromMaybe (error $ "Undefined variable: " ++ v) (lookup v (fst env))
+resolveArg _ (ValArg val) = val
+resolveArg env (FunArg (f, args)) = case exec (FCall f args) env of
+    (venv, _) -> fromMaybe (error "No return value") (lookup "" venv)
 
 callFun :: FName -> Env -> Env
 callFun fn env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
@@ -201,6 +210,9 @@ sum100output = run sum100
 
 lexer :: String -> [Token]
 lexer "" = []
+--comments
+lexer ('-':'-':xs) = lexer (dropWhile (/='\n') xs)
+
 --Punctuation
 lexer ('(':xs)      = LPar : lexer xs                --Left parenthesis case 
 lexer (')':xs)      = RPar : lexer xs                --Right parenthesis case
@@ -285,16 +297,16 @@ sr (PI i2 : Keyword ElseK :Semi :PI i1 : Keyword ThenK : PB b : Keyword IfK : ts
     = sr (PI (IfThenElse b i1 i2 ) : ts ) q                             
     --Nop
 sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
-
 -----------------
-
 sr (RSqu : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 --get the input varibales or constants for the function
 sr (LSqu: s) q = sr (Inputs [] : s) q 
-sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (Right c:es):s) q
-sr(Comma : PA (Var v) : Inputs es: s) q = sr (Inputs (Left v:es):s) q
-sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (Right c:es): s) q 
-sr(RSqu: PA (Var v) : Inputs es:s ) q = sr (RSqu : Inputs (Left v:es): s) q 
+sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (ValArg c:es):s) q
+sr(Comma : PA (Var v) : Inputs es: s) q = sr (Inputs (VarArg v:es):s) q
+sr(Comma : PI (FCall f args) : Inputs es: s) q = sr (Inputs (FunArg (f, args):es):s) q
+sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (ValArg c:es): s) q
+sr(RSqu: PA (Var v) : Inputs es:s ) q = sr (RSqu : Inputs (VarArg v:es): s) q
+sr(RSqu: PI (FCall f args) : Inputs es:s ) q = sr (RSqu : Inputs (FunArg (f, args):es): s) q
 
 sr (LPar : NSym n:  s) q = sr (Params []: LPar : NSym n : s) q 
 sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
@@ -355,14 +367,21 @@ main = repl
 
 repl :: IO ()
 repl = do
+    putStrLn $ replicate 40 '~'
     putStrLn "Enter file name:"
     fileName <- getLine
-    contents <- readFile fileName
-    case contents of 
-        "quit" -> return () 
-        s -> case parse (lexer contents) of 
-            Left expr -> putStrLn ("Evaluates to: " ++ show (run expr))
-            Right err -> putStrLn err
+    if fileName == "quit"
+        then do
+            putStrLn "Cya! it was fun while it lasted"
+            return ()
+        else do
+            contents <- readFile fileName
+            putStrLn $ replicate 40 'V' -- Print 40 V to show that the specific file output
+            case parse (lexer contents) of 
+                Left expr -> putStrLn ("Evaluates to: " ++ show (run expr))
+                Right err -> putStrLn err
+            putStrLn $ replicate 40 '^' -- Print 40 equals signs for separation
+            repl  -- Loop back to the start
         
         
 
@@ -440,7 +459,7 @@ instructions =
                                 , Return (Var "x")
                                 ]
                        }
-    , FCall "bruh" [Right 5]
+    , FCall "bruh" [ValArg 5]
     ]
 
 testLexFun :: String
@@ -451,7 +470,22 @@ testLex2 = "Bruh(x, d,y){if (x <= d) then d:=x; else while (d < x) {d:=(d+x); x:
 
 test = parse (lexer testLexFun)
 
+runTests :: IO ()
+runTests = do
+        -- Get all files in the current directory
+        files <- listDirectory "."
 
+        -- Filter out the .imp files
+        let impFiles = filter (\file -> takeExtension file == ".imp") files
+
+        -- Run the interpreter on each .imp file
+        mapM_ runTest impFiles
+    where
+        runTest file = do
+                content <- readFile file
+                case parse (lexer content) of 
+                        Left expr -> putStrLn (file ++ " evaluates to: " ++ show (run expr))
+                        Right err -> putStrLn (file ++ " error: " ++ err)
 {-
 parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LSqu,CSym 5,RSqu,Semi]
 

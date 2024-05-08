@@ -1,3 +1,6 @@
+z:=3; -- testing comment and fields
+q:=17;
+r:=1;
 
 Bruh(x, d,y){
 if (x <= d)
@@ -9,7 +12,6 @@ if (x <= d)
     } ; 
 return d;
 }
-
-Bruh[3,7,1];
+Bruh[z,q,r]; -- should eval to 3
 
 

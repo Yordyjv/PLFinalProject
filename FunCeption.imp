@@ -1,0 +1,19 @@
+-- this one should all a function inside another function tat was predefined and works
+
+Sq (x){
+    x:=(x*x);
+    return x;
+}
+
+Bruh(x, d,y){
+if (x <= d)
+    then d :=(Sq[x]);
+    else while (d < x) {
+        d:=(d+x);
+        x:=(x+4);
+        d:=(d-y);
+    }; 
+return d;
+}
+
+Bruh[Sq[2],Sq[3],1]; -- 

@@ -1,0 +1,19 @@
+-- should eval to 19 with conflicting field and params
+x:=3;
+d:=17;
+y:=1;
+
+Bruh(x, d,y){
+g:=15; --tests local scope of variables and not care about this comment
+if (x <= d)
+    then d:=(x+1+g);
+    else while (d < x) {
+        d:=(d+x);
+        x:=(x+4);
+        d:=(d-y);
+    } ; 
+return d;
+}
+
+
+Bruh[x,d,y];

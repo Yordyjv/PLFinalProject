@@ -6,7 +6,7 @@ Double (x){
 
 Bruh(x, d,y){
 if (x <= d)
-    then d := Double[d];
+    then d :=x;
     else while (d < x) {
         d:=(d+x);
         x:=(x+4);
@@ -15,4 +15,4 @@ if (x <= d)
 return d;
 }
 
-Bruh[7,3,1];
+Bruh[Double[2],Double[3],1]; -- essentially bruh[4,6,1] should return 4 as (2*2 < 3*2)

@@ -1,6 +1,7 @@
+--first test file...
 Bruh(x){
     x:=(x*x);
     return x;
 } 
 
-Bruh[5];
+Bruh[5]; -- should eval to 25
