@@ -263,17 +263,18 @@ sr (PI i2 : Keyword ElseK : PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
     --Nop
 sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
+sr (NSym n:LPar: s) q = sr (Params []: (NSym n):s) q 
+sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
+sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
+sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
+    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
+
 sr (LPar: s) q = sr (Inputs []: s) q 
-sr(Comma : Input e: Inputs es: s) q = sr (Inputs (e:es):s) q
-sr(RPar: Input e: Inputs es:s ) q = sr (RPar: Inputs (e:es): s) q --HERE
+sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (c:es):s) q
+sr(RPar: PA (Const c) : Inputs es:s ) q = sr (RPar: Inputs (c:es): s) q --HERE
 -- Function call
 sr (RPar : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 -- Function definition
-sr (NSym n:LPar: s) q = sr (Params []: (NSym n):s) q 
-sr (Comma: Param v: Params vs:s ) q = sr (Params (v:vs) : s) q
-sr(RPar : Param v: Params vs : s) q = sr (RPar:Params (v:vs):s) q
-sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (FunDefT (FunDef n (zip ps (repeat defaultV)) (reverse is)) : ts) q
 --Block
 sr (LBra: ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
@@ -297,10 +298,11 @@ blocker :: [Token] -> [Token] -> [Token]
 blocker [] x = x
 blocker (x:xs) (Block(i):[]) = case x of 
     Semi -> blocker xs (Block(i):[])
+    RPar -> blocker xs (Block(i):[])
     PI x -> blocker xs (Block(x:i):[])
-    unexpected -> [Err$ "Block Error" ++ show unexpected]
+    unexpected -> [Err$ "Block Error" ++ show unexpected ++ " in " ++ show (x:xs)]
 
-
+ 
 
 run :: [Instr] -> Integer
 run p = case lookup "" (fst (execList p ([],[]))) of
@@ -412,3 +414,6 @@ instructions =
 testLexFun :: String
 testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh(5);"
 
+{-
+[NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LPar,CSym 5,RPar,Semi]
+-}
