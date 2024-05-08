@@ -260,6 +260,7 @@ sr (PA e2 : BOp MulOp : PA e1 : ts) i = sr (PA (Mul e1 e2) : ts) i
 sr (PA e2 : BOp DivOp : PA e1 : ts) i = sr (PA (Div e1 e2) : ts) i   
     --Assign
 sr (PA e : AssignOp : PA (Var v) : ts) q = sr (PI (Assign v e) : ts) q  
+
     --IfThenElse
 sr (PI i2 : Keyword ElseK : PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
     = sr (PI (IfThenElse b i1 i2 ) : ts ) q                             
@@ -276,27 +277,31 @@ sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (c:es): s) q --HERE
 
 
 
-sr (LPar : s) q = sr (Params []: LPar :s) q 
+sr (LPar : NSym n:  s) q = sr (Params []: LPar : NSym n : s) q 
 sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
 sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
 
 
 --Block
-sr (LBra : ts) q = sr (Block []: ts) q
-sr (RBra : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
-sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
-sr (RBra : Block is : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
+sr (LBra : PI i : ts)            q = sr (Block [i] : LBra : ts) q --Left bracket, start block with next instruction
+sr (RBra : Semi:  PI i : ts) q = sr (Block [i] : ts) q -- RBra then Semi then instruction, means the bloc
+sr (Block is : Semi : PI i : ts) q = sr (Block (i:is) : ts) q
+sr (Block is : LBra : ts)        q = sr (PI (Do is) : ts)   q
+
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
 -- Function call
-
+sr (PI (Do is) : RPar: Params ps : LPar : NSym n : ts) q = let defaultV = -999 :: Value in
+    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
 -- Function definition
 
 --Syntax
 sr (RPar : PI e : LPar : s) q = sr (PI e : s) q --parenthesis
 sr (RPar : PA e : LPar : s) q = sr (PA e : s) q --parenthesis
 sr (RPar : PB e : LPar : s) q = sr (PB e : s) q --parenthesis
+
+sr (Semi : PI e: s) q = sr (PI e : s) q
+
 --shift 
 sr s (i:q) = sr (i:s) q 
 --exit 
@@ -422,7 +427,7 @@ instructions =
     ]
 
 testLexFun :: String
-testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh[5];"
+testLexFun = "Bruh(x){ x:=(x*2); return x; } Bruh[5];"
 
 test = parse (lexer testLexFun)
 
