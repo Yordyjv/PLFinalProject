@@ -50,6 +50,7 @@ data Token = VSym String | CSym Integer | BSym Bool
     | UOp UOps | BOp BOps | AssignOp
     | Keyword Keywords
     | Err String
+    | LSqu | RSqu
     | PA AExpr | PB BExpr | PI Instr | Block [Instr] | Input Value | Param VName
     | Params [VName] | Inputs[Value]
     | FunDefT FunDef
@@ -186,6 +187,8 @@ lexer ('(':xs)      = LPar : lexer xs                --Left parenthesis case
 lexer (')':xs)      = RPar : lexer xs                --Right parenthesis case
 lexer ('{':xs)      = LBra : lexer xs                --Left bracket case 
 lexer ('}':xs)      = RBra : lexer xs                --Right bracket case
+lexer ('[':xs)      = LSqu : lexer xs 
+lexer (']':xs)      = RSqu : lexer xs 
 lexer(',':xs)= Comma : lexer xs
 lexer (';':xs)      = Semi : lexer xs
 --Constants
@@ -265,25 +268,25 @@ sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
 -----------------
 
-sr (LPar : NSym n : s) q = sr (Params []: (NSym n) : LPar :s) q 
-sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
-sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
-sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
-
-sr (LPar: s) q = sr (Inputs []: LPar : s) q 
-sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (c:es):s) q
-sr(RPar: PA (Const c) : Inputs es:s ) q = sr (RPar : Inputs (c:es): s) q --HERE
--- Function call
-sr (RPar : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
--- Function definition
-
 --Block
 sr (LBra : ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
 sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
+
+sr (LPar : s) q = sr (Params []: LPar :s) q 
+sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
+sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
+sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
+    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
+
+sr (LSqu: s) q = sr (Inputs [] : s) q 
+sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (c:es):s) q
+sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (c:es): s) q --HERE
+-- Function call
+sr (RSqu : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
+-- Function definition
 
 --Syntax
 sr (RPar : PI e : LPar : s) q = sr (PI e : s) q --parenthesis
@@ -301,7 +304,6 @@ blocker :: [Token] -> [Token] -> [Token]
 blocker [] x = x
 blocker (x:xs) (Block(i):[]) = case x of 
     Semi -> blocker xs (Block(i):[])
-    RPar -> blocker xs (Block(i):[])
     PI x -> blocker xs (Block(x:i):[])
     unexpected -> [Err$ "Block Error" ++ show unexpected ++ " in " ++ show (x:xs)]
 
@@ -415,10 +417,12 @@ instructions =
     ]
 
 testLexFun :: String
-testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh(5);"
+testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh[5];"
 
 {-
-parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LPar,CSym 5,RPar,Semi]
+parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LSqu,CSym 5,RSqu,Semi]
+
+
 
 "Lexical Error: Block ErrorPA (Const 5) in [PA (Const 5),Params [],
 NSym \"Bruh\",LPar,RBra,Semi,PI (Return (Var \"x\")),Semi,

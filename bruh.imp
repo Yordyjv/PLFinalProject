@@ -3,4 +3,4 @@ Bruh(x){
     return x;
 }
 
-Bruh(5);
+Bruh[5];
