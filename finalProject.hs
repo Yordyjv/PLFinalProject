@@ -43,14 +43,15 @@ data BOps = AddOp | SubOp | MulOp | DivOp
     | AndOp | OrOp | EqlOp | LtOp | LteOp
     | ModOp | GreOp | GrOp
     deriving Show
+
 data Token = VSym String | CSym Integer | BSym Bool
     | NSym String --Starts with uppercase letter, followed by 0 or more letters/digits
-    | LPar | RPar | LBra | RBra | Semi
+    | LPar | RPar | LBra | RBra | Semi | Comma
     | UOp UOps | BOp BOps | AssignOp
     | Keyword Keywords
     | Err String
     | PA AExpr | PB BExpr | PI Instr | Block [Instr]
-    | Params [VName] 
+    | Params [VName] | Inputs[AExpr]
     | FunDefT FunDef
     deriving Show
 
@@ -185,6 +186,7 @@ lexer ('(':xs)      = LPar : lexer xs                --Left parenthesis case
 lexer (')':xs)      = RPar : lexer xs                --Right parenthesis case
 lexer ('{':xs)      = LBra : lexer xs                --Left bracket case 
 lexer ('}':xs)      = RBra : lexer xs                --Right bracket case
+lexer(',':xs)= Comma : lexer xs
 lexer (';':xs)      = Semi : lexer xs
 --Constants
 lexer ('T':'r':'u':'e':xs)          = BSym True : lexer xs      --Boolean constant True
@@ -261,19 +263,24 @@ sr (PI i2 : Keyword ElseK : PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
     --Nop
 sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
-    --Block
+sr (LPar: s) q = sr (Inputs []: s) q 
+sr(Comma : PA e: Inputs es: s) q = sr (Inputs (e:es):s) q
+sr(RPar: PA e: Inputs es:s ) q = sr (RPar: Inputs (e:es): s) q --HERE
+-- Function call
+sr (RPar : Inputs es : NSym n : ts) q = sr (PA (FCallA (FCall n (reverse es))) : ts) q
+-- Function definition
+sr (NSym n:LPar: s) q = sr (Params []: NSym:s) q 
+sr (Comma:PA v: Params vs:s ) q = (Params ((v,-9999):vs):s) q
+sr(RPar : PA v: Params vs : s) q = (RPar:Params (v:vs):s) q
+sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = sr (FunDefT (FunDef n ps (reverse is)) : ts) q
+--Block
 sr (LBra: ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
 sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
-    --Function 
---sr (Semi : RBra : Block i : LBra : Params l : NSym : ts) = sr (FunDef (Do (reverse i)) : Params l : Keyword NSym : ts) q   
---instead of tuurning it into a fundeft turn it into a n fassing PI.
- --Return
 
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
-
-    --Syntax
+--Syntax
 sr (RPar : PI e : LPar : s) q = sr (PI e : s) q --parenthesis
 sr (RPar : PA e : LPar : s) q = sr (PA e : s) q --parenthesis
 sr (RPar : PB e : LPar : s) q = sr (PB e : s) q --parenthesis
@@ -283,6 +290,9 @@ sr s (i:q) = sr (i:s) q
 sr (Err e : s) _ = [Err e]
 sr [Block i] [] = [Block i]
 sr s [] = blocker s (Block [] : [])
+
+
+
 
 blocker :: [Token] -> [Token] -> [Token]
 blocker [] x = x
@@ -399,3 +409,7 @@ instructions =
                        }
     , FCall "bruh" [5]
     ]
+
+testLexFun :: String
+testLexFun = "Bruh(x){ x:=(x*2); return x; } Bruh(5);"
+
