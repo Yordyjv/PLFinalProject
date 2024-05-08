@@ -503,7 +503,6 @@ runTests = do
 parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LSqu,CSym 5,RSqu,Semi]
 
 
-
 "Lexical Error: Block ErrorPA (Const 5) in [PA (Const 5),Params [],
 NSym \"Bruh\",LPar,RBra,Semi,PI (Return (Var \"x\")),Semi,
 PA (Const 2),BOp MulOp,PI (Assign \"x\" (Var \"x\")),Block [],

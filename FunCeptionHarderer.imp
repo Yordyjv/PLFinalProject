@@ -1,0 +1,31 @@
+Sq(x) {
+    x := (x * x);
+    return x;
+}
+Double (x){
+    x:=(x*2);
+    return x;
+}
+
+Bruh(x, d,y){
+if (x <= d)
+    then d :=Double[Sq[x]]; -- harder version cuz param pass
+    else while (d < x) { 
+        d:=(d+x);
+        x:=(x+4);
+        d:=(d-y);
+    }; 
+return d;
+}
+
+
+Print(x){
+    return x;
+}
+
+a := Sq[4]; -- a gets assigned the result of Sq[3] which is 9
+b := Sq[5]; -- b gets assigned the result of Sq[2] which is 4
+
+result := Bruh[a, b, 1]; -- calls Bruh with a = 9, b = 4, and y = 1
+
+Print[result];
