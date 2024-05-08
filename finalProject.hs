@@ -263,25 +263,28 @@ sr (PI i2 : Keyword ElseK : PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
     --Nop
 sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
-sr (NSym n:LPar: s) q = sr (Params []: (NSym n):s) q 
+-----------------
+
+sr (NSym n:LPar: s) q = sr (Params []: (NSym n) : LPar :s) q 
 sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
 sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
 sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
     sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
 
-sr (LPar: s) q = sr (Inputs []: s) q 
+sr (LPar: s) q = sr (Inputs []: LPar : s) q 
 sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (c:es):s) q
-sr(RPar: PA (Const c) : Inputs es:s ) q = sr (RPar: Inputs (c:es): s) q --HERE
+sr(RPar: PA (Const c) : Inputs es:s ) q = sr (RPar : Inputs (c:es): s) q --HERE
 -- Function call
 sr (RPar : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 -- Function definition
+
 --Block
-sr (LBra: ts) q = sr (Block []: ts) q
+sr (LBra : ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
 sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
-
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
+
 --Syntax
 sr (RPar : PI e : LPar : s) q = sr (PI e : s) q --parenthesis
 sr (RPar : PA e : LPar : s) q = sr (PA e : s) q --parenthesis
@@ -415,5 +418,13 @@ testLexFun :: String
 testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh(5);"
 
 {-
-[NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LPar,CSym 5,RPar,Semi]
+parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LPar,CSym 5,RPar,Semi]
+
+
+"Lexical Error: Block ErrorInputs [5] in [Inputs [5],LPar,NSym \"Bruh\",RBra,Semi,
+PI (Return (Var \"x\")),Semi,PA (Const 2),BOp MulOp,PI (Assign \"x\" (Var \"x\")),
+Block [],RPar,PA (Var \"x\"),Inputs [],LPar,NSym \"Bruh\"]"
+
+--
+
 -}
