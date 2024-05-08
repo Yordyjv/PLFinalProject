@@ -135,6 +135,7 @@ exec (While condI doI) env =
         then exec (While condI doI) (exec doI env)
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
+exec (FCall name vs) = callFun name (setParms name vs env)
 exec Nop env = env
 
 -- exec (FCall n vs) env = setParms n vs env 
@@ -388,3 +389,15 @@ sr(Rbra : Do is : (Lbra?) : InputVars xs : NSym f : AccessT : s) q = sr (FunDefT
 eval: 
 evaluate record-  call a helper to evaluate the function definition, get a return value from the function 
 -}
+
+
+instructions :: [Instr]
+instructions = 
+    [ FAssign $ FunDef { fname = "bruh"
+                       , params = [("x",  0)] -- Default value 0
+                       , body = [ Assign "x" (Mul (Var "x") (Var "x"))
+                                , Return (Var "x")
+                                ]
+                       }
+    , FCall "bruh" [5]
+    ]
