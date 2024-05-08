@@ -135,10 +135,8 @@ exec (While condI doI) env =
         then exec (While condI doI) (exec doI env)
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
-exec (FCall name vs) = callFun name (setParms name vs env)
 exec Nop env = env
-
--- exec (FCall n vs) env = setParms n vs env 
+exec (FCall n vs) env = callFun n (setParms n vs env)
 exec (Return a) env = (updateV ("", evala env a) (fst env), snd env)
 
 setParms :: FName -> [Value] -> Env -> Env
