@@ -1,15 +1,18 @@
 
+Double (x){
+    x:=(x*2);
+    return x;
+}
+
 Bruh(x, d,y){
 if (x <= d)
-    then d:=x;
+    then d := Double[d];
     else while (d < x) {
         d:=(d+x);
         x:=(x+4);
         d:=(d-y);
-    } ; 
+    }; 
 return d;
 }
 
-Bruh[3,7,1];
-
-
+Bruh[7,3,1];

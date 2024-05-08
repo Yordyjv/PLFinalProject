@@ -2,6 +2,11 @@ import Data.Char
 import Language.Haskell.TH (safe)
 import Control.Monad.RWS (MonadState(put))
 --Worked with Kevin Portillo
+--Funtions are always Camel Case
+--fucntion defintions start with fname (params sep by commas)
+--functions calls are fname [input vars split by commas]
+
+
 
 type FunList = Either AExpr BExpr 
 type FName = String  --Function names 
@@ -138,8 +143,15 @@ exec (While condI doI) env =
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
 exec Nop env = env
-exec (FCall n vs) env = callFun n (setParms n vs env)
+exec (FCall n vs) env = callFun n (setParms n vs env) -- this works if vs are values so only integers
 exec (Return a) env = (updateV ("", evala env a) (fst env), snd env)
+
+
+
+execList :: [Instr] -> Env -> Env
+execList instrs env = foldl (\e i -> exec i e) env instrs
+
+
 
 setParms :: FName -> [Value] -> Env -> Env
 setParms fn vs env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
@@ -159,10 +171,6 @@ callFun fn env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
 
 --lokup the function in fenv of env
 --then map [values] to [var(strs)] output [(vars,values)]
-
-
-execList :: [Instr] -> Env -> Env
-execList instrs env = foldl (\e i -> exec i e) env instrs
 
 
 
@@ -262,7 +270,7 @@ sr (PA e2 : BOp DivOp : PA e1 : ts) i = sr (PA (Div e1 e2) : ts) i
 sr (PA e : AssignOp : PA (Var v) : ts) q = sr (PI (Assign v e) : ts) q  
 
     --IfThenElse
-sr (PI i2 : Keyword ElseK : PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
+sr (PI i2 : Keyword ElseK :Semi :PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
     = sr (PI (IfThenElse b i1 i2 ) : ts ) q                             
     --Nop
 sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
@@ -292,7 +300,7 @@ sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
 -- Function call
 sr (PI (Do is) : RPar: Params ps : LPar : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (is))) : ts) q
+    sr (PI (FAssign (FunDef n (reverse (zip ps (repeat defaultV))) (is))) : ts) q
 -- Function definition
 
 --Syntax
