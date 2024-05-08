@@ -58,7 +58,7 @@ data Token = VSym String | CSym Integer | BSym Bool
 --FUNCTIONS, CLASSES 
 
 type VName = String 
-type Value = Either Integer Bool
+type Value = Integer 
 type VEnv = [(VName, Value)] --fields
 
 type FEnv = [FunDef] -- fundefs
@@ -88,8 +88,8 @@ data FunDef = FunDef { fname :: FName
 
 -- update (x,v) e sets the value of x to v and keeps other variables in e the same
 updateV :: (Vars, Integer) -> VEnv -> VEnv
-updateV (x, v) [] = [(x, v),[]]
-updateV (x, v) ((e, val):env,[])
+updateV (x, v) [] = [(x, v)] 
+updateV (x, v) ((e, val):env)
     | x /= e    = (e, val) : updateV (x, v) env
     | otherwise = (x, v) : env
 
@@ -124,7 +124,7 @@ evalb env (Lte p1 p2)
     | otherwise = evalb env FF
 
 exec :: Instr -> Env -> Env
-exec (Assign v a) env = updateV (v, evala (env a)) fst env
+exec (Assign v a) env = (updateV (v, evala env a) (fst env), snd env)
 exec (FAssign fundef) (venv,fenv) = (venv, fundef:fenv)
 exec (IfThenElse condI thenI elseI) env =
     if evalb env condI
@@ -138,19 +138,21 @@ exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
 exec Nop env = env
 
 -- exec (FCall n vs) env = setParms n vs env 
-exec (Return a) env = update ("", evala env a) env 
+exec (Return a) env = (updateV ("", evala env a) (fst env), snd env)
 
 setParms :: FName -> [Value] -> Env -> Env
 setParms fn vs env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
     Just fundef -> 
-        let newFundef = fundef { params = (zip (params fundef) vs) }
-            newFenv = (fn, newFundef) : filter ((/= fn) . fname . snd) fenv
+        let varnames = map fst (params fundef)
+            newparams = zip varnames vs
+            newFundef = fundef { params = newparams }
+            newFenv = map (\f -> if fname f == fn then newFundef else f) fenv
         in (venv, newFenv)
     Nothing -> env
 
 callFun :: FName -> Env -> Env
 callFun fn env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
-    Just fundef ->  execList fundef.body (fundef.params,fenv)
+    Just fundef ->  let {params' = params fundef; body' = body fundef} in execList body' (params', fenv)
     Nothing -> env
 
 
@@ -293,7 +295,7 @@ blocker (x:xs) (Block(i):[]) = case x of
 
 
 run :: [Instr] -> Integer
-run p = case lookup "" (execList p []) of
+run p = case lookup "" (fst (execList p ([],[]))) of
     Just x -> x
     Nothing -> error "No value returned."
 
