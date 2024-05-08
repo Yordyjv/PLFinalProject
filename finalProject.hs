@@ -27,7 +27,7 @@ data FunDef = FunDef { fname :: FName
                         deriving Show
 
 
-data Arg = VarArg VName | ValArg Value | FunArg (FName, [Arg])
+data Arg = VarArg VName | ValArg Value | FunArg (FName, [Arg]) | AExprArgs AExpr
     deriving Show
 
 
@@ -51,7 +51,6 @@ data AExpr = Var Vars | Const Integer -- Arithmetic expressions
     | Add AExpr AExpr | Sub AExpr AExpr
     | Mul AExpr AExpr | Div AExpr AExpr
     | Mod AExpr 
-    | FCallA AExpr --returns the evaluated function 
     deriving Show
 data BExpr = TT | FF -- Boolean expressions
     | And BExpr BExpr | Or BExpr BExpr | Not BExpr
@@ -65,6 +64,7 @@ data BExpr = TT | FF -- Boolean expressions
 
 
 data Instr = Assign Vars AExpr -- assignment
+    | AssignF Vars Instr -- assingment of variables where instr is strictly a pi (FCall fn args)
     | IfThenElse BExpr Instr Instr -- conditional
     | While BExpr Instr -- looping construct
     | Do [Instr] -- a block of several instructions
@@ -117,7 +117,6 @@ updateV (x, v) ((e, val):env)
 
 
 
-
 evala :: Env -> AExpr -> Integer
 evala (venv,fenv) (Var x) = case lookup x venv of
                      Just val -> val
@@ -127,6 +126,7 @@ evala env (Add e1 e2) = evala env e1 + evala env e2
 evala env (Sub e1 e2) = evala env e1 - evala env e2
 evala env (Mul e1 e2) = evala env e1 * evala env e2
 evala env (Div e1 e2) = evala env e1 `div` evala env e2
+
 
 evalb :: Env -> BExpr -> Bool
 evalb env TT = True
@@ -146,6 +146,9 @@ evalb env (Lte p1 p2)
 
 exec :: Instr -> Env -> Env
 exec (Assign v a) env = (updateV (v, evala env a) (fst env), snd env)
+exec (AssignF v (FCall fn args)) env = 
+    let newEnv = callFun fn (setParms fn args env) in
+    (updateV (v, lookupV "" newEnv) (fst env), snd env)
 exec (FAssign fundef) (venv,fenv) = (venv, fundef:fenv)
 exec (IfThenElse condI thenI elseI) env =
     if evalb env condI
@@ -157,10 +160,11 @@ exec (While condI doI) env =
         else env
 exec (Do instrs) env = foldl (\e i -> exec i e) env instrs
 exec Nop env = env
-exec (FCall n vs) env = callFun n (setParms n vs env) -- this works if vs are values so only integers
+exec (FCall n vs) env = callFun n (setParms n vs env) 
 exec (Return a) env = (updateV ("", evala env a) (fst env), snd env)
 
-
+lookupV :: Vars -> Env -> Integer
+lookupV v (venv, _) = fromMaybe 0 (lookup v venv)
 
 execList :: [Instr] -> Env -> Env
 execList instrs env = foldl (\e i -> exec i e) env instrs
@@ -180,13 +184,16 @@ setParms fn args env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
 resolveArg :: Env -> Arg -> Value
 resolveArg env (VarArg v) = fromMaybe (error $ "Undefined variable: " ++ v) (lookup v (fst env))
 resolveArg _ (ValArg val) = val
+resolveArg env (AExprArgs expr) = evala env expr
 resolveArg env (FunArg (f, args)) = case exec (FCall f args) env of
     (venv, _) -> fromMaybe (error "No return value") (lookup "" venv)
 
+--calls and runs functions at the top level
 callFun :: FName -> Env -> Env
 callFun fn env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
     Just fundef ->  let {params' = params fundef; body' = body fundef} in execList body' (params', fenv)
     Nothing -> env
+
 
 
 --lokup the function in fenv of env
@@ -289,8 +296,12 @@ sr (PA e2 : BOp AddOp : PA e1 : ts) i = sr (PA (Add e1 e2) : ts) i
 sr (PA e2 : BOp SubOp : PA e1 : ts) i = sr (PA (Sub e1 e2) : ts) i
 sr (PA e2 : BOp MulOp : PA e1 : ts) i = sr (PA (Mul e1 e2) : ts) i  
 sr (PA e2 : BOp DivOp : PA e1 : ts) i = sr (PA (Div e1 e2) : ts) i   
-    --Assign
+    --Assign -- helppp
 sr (PA e : AssignOp : PA (Var v) : ts) q = sr ( PI (Assign v e) : ts) q 
+--Assign Case where we have a x= Foo(2) this can inantly be evaluated given that foo is defined before x's assingmen
+sr (PI (FCall fn args) : AssignOp : PA (Var v) : ts) q = sr ( PI (AssignF v ((FCall fn args))) : ts) q 
+-- assign case where we have bruh(y){ x=foo(y); return x;} canoot be instantly evald until y is evaled. store as aexpr and in evalA have a case for that
+
 
     --IfThenElse
 sr (PI i2 : Keyword ElseK :Semi :PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
@@ -303,11 +314,13 @@ sr (RSqu : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 sr (LSqu: s) q = sr (Inputs [] : s) q 
 sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (ValArg c:es):s) q
 sr(Comma : PA (Var v) : Inputs es: s) q = sr (Inputs (VarArg v:es):s) q
+sr(Comma : PA a: Inputs es: s) q = sr (Inputs (AExprArgs a:es):s) q
 sr(Comma : PI (FCall f args) : Inputs es: s) q = sr (Inputs (FunArg (f, args):es):s) q
 sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (ValArg c:es): s) q
 sr(RSqu: PA (Var v) : Inputs es:s ) q = sr (RSqu : Inputs (VarArg v:es): s) q
+sr(RSqu : PA a: Inputs es: s) q = sr (Inputs (AExprArgs a:es):s) q
 sr(RSqu: PI (FCall f args) : Inputs es:s ) q = sr (RSqu : Inputs (FunArg (f, args):es): s) q
-
+---END INPUT HANDLING -- START PARAM HANDLING -- could add type keywords here to allow for boolean params
 sr (LPar : NSym n:  s) q = sr (Params []: LPar : NSym n : s) q 
 sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
 sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q

@@ -7,7 +7,7 @@ Sq (x){
 
 Bruh(x, d,y){
 if (x <= d)
-    then d :=(Sq[2]); -- easier version no param pass
+    then d :=Sq[x]; -- harder version cuz param pass
     else while (d < x) {
         d:=(d+x);
         x:=(x+4);
@@ -16,4 +16,4 @@ if (x <= d)
 return d;
 }
 
-Bruh[Sq[2],Sq[3],1]; -- should b 4 cuz x<=d and 2^2 is 4
+Bruh[Sq[6],Sq[7],1]; -- 1296 cuz 6^4
