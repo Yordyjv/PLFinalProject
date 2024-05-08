@@ -268,24 +268,29 @@ sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
 -----------------
 
---Block
-sr (LBra : ts) q = sr (Block []: ts) q
-sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
-sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
-sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
-sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
-
-sr (LPar : s) q = sr (Params []: LPar :s) q 
-sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
-sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
-sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
+sr (RSqu : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 
 sr (LSqu: s) q = sr (Inputs [] : s) q 
 sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (c:es):s) q
 sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (c:es): s) q --HERE
+
+
+
+sr (LPar : s) q = sr (Params []: LPar :s) q 
+sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
+sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
+
+
+--Block
+sr (LBra : ts) q = sr (Block []: ts) q
+sr (RBra : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
+sr (Semi : RBra : Block i : PB b : Keyword WhileK : ts) q = sr (PI (Do (reverse i)): PB b: Keyword WhileK : ts) q
+sr (RBra : Block is : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
+    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
+sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
+sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
 -- Function call
-sr (RSqu : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
+
 -- Function definition
 
 --Syntax
@@ -303,7 +308,7 @@ sr s [] = blocker s (Block [] : [])
 blocker :: [Token] -> [Token] -> [Token]
 blocker [] x = x
 blocker (x:xs) (Block(i):[]) = case x of 
-    Semi -> blocker xs (Block(i):[])
+    RBra -> blocker xs (Block(i):[])
     PI x -> blocker xs (Block(x:i):[])
     unexpected -> [Err$ "Block Error" ++ show unexpected ++ " in " ++ show (x:xs)]
 
@@ -418,6 +423,9 @@ instructions =
 
 testLexFun :: String
 testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh[5];"
+
+test = parse (lexer testLexFun)
+
 
 {-
 parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LSqu,CSym 5,RSqu,Semi]
