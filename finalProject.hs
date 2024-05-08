@@ -265,7 +265,7 @@ sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
 -----------------
 
-sr (NSym n:LPar: s) q = sr (Params []: (NSym n) : LPar :s) q 
+sr (LPar : NSym n : s) q = sr (Params []: (NSym n) : LPar :s) q 
 sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
 sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
 sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
@@ -420,11 +420,13 @@ testLexFun = "Bruh(x){ x:=x*2; return x; } Bruh(5);"
 {-
 parse [NSym "Bruh",LPar,VSym "x",RPar,LBra,VSym "x",AssignOp,VSym "x",BOp MulOp,CSym 2,Semi,Keyword ReturnK,VSym "x",Semi,RBra,NSym "Bruh",LPar,CSym 5,RPar,Semi]
 
+"Lexical Error: Block ErrorPA (Const 5) in [PA (Const 5),Params [],
+NSym \"Bruh\",LPar,RBra,Semi,PI (Return (Var \"x\")),Semi,
+PA (Const 2),BOp MulOp,PI (Assign \"x\" (Var \"x\")),Block [],
+RPar,Params [\"x\"],NSym \"Bruh\",LPar]"
 
-"Lexical Error: Block ErrorInputs [5] in [Inputs [5],LPar,NSym \"Bruh\",RBra,Semi,
-PI (Return (Var \"x\")),Semi,PA (Const 2),BOp MulOp,PI (Assign \"x\" (Var \"x\")),
-Block [],RPar,PA (Var \"x\"),Inputs [],LPar,NSym \"Bruh\"]"
+--Inputs 5 ( Bruh } ; Return x ; 2 * =: x 
 
---
+
 
 -}
