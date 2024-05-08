@@ -272,8 +272,8 @@ sr (RPar : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 sr (NSym n:LPar: s) q = sr (Params []: (NSym n):s) q 
 sr (Comma: Param v: Params vs:s ) q = sr (Params (v:vs) : s) q
 sr(RPar : Param v: Params vs : s) q = sr (RPar:Params (v:vs):s) q
-sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (FunDefT (FunDef n (map (zip ps defaultV)) (reverse is)) : ts) q
+--sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
+--    sr (FunDefT (FunDef n (map (zip ps defaultV)) (reverse is)) : ts) q
 --Block
 sr (LBra: ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
