@@ -292,21 +292,19 @@ sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
 -- Function call
 sr (PI (Do is) : RPar: Params ps : LPar : NSym n : ts) q = let defaultV = -999 :: Value in
-    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (reverse is))) : ts) q
+    sr (PI (FAssign (FunDef n (zip ps (repeat defaultV)) (is))) : ts) q
 -- Function definition
 
 --Syntax
 sr (RPar : PI e : LPar : s) q = sr (PI e : s) q --parenthesis
 sr (RPar : PA e : LPar : s) q = sr (PA e : s) q --parenthesis
 sr (RPar : PB e : LPar : s) q = sr (PB e : s) q --parenthesis
-
-sr (Semi : PI e: s) q = sr (PI e : s) q
-
 --shift 
 sr s (i:q) = sr (i:s) q 
 --exit 
 sr (Err e : s) _ = [Err e]
 sr [Block i] [] = [Block i]
+sr (Semi: PI i : s) q = sr (PI i : s) q 
 sr s [] = blocker s (Block [] : [])
 
 
