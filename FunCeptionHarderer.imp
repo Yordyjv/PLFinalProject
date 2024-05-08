@@ -28,4 +28,4 @@ b := Sq[5]; -- b gets assigned the result of Sq[2] which is 4
 
 result := Bruh[a, b, 1]; -- calls Bruh with a = 9, b = 4, and y = 1
 
-Print[result];
+Print[result]; --512
