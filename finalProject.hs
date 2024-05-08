@@ -50,8 +50,8 @@ data Token = VSym String | CSym Integer | BSym Bool
     | UOp UOps | BOp BOps | AssignOp
     | Keyword Keywords
     | Err String
-    | PA AExpr | PB BExpr | PI Instr | Block [Instr]
-    | Params [VName] | Inputs[AExpr]
+    | PA AExpr | PB BExpr | PI Instr | Block [Instr] | Input Value | Param VName
+    | Params [VName] | Inputs[Value]
     | FunDefT FunDef
     deriving Show
 
@@ -264,15 +264,16 @@ sr (PI i2 : Keyword ElseK : PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
 sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 
 sr (LPar: s) q = sr (Inputs []: s) q 
-sr(Comma : PA e: Inputs es: s) q = sr (Inputs (e:es):s) q
-sr(RPar: PA e: Inputs es:s ) q = sr (RPar: Inputs (e:es): s) q --HERE
+sr(Comma : Input e: Inputs es: s) q = sr (Inputs (e:es):s) q
+sr(RPar: Input e: Inputs es:s ) q = sr (RPar: Inputs (e:es): s) q --HERE
 -- Function call
-sr (RPar : Inputs es : NSym n : ts) q = sr (PA (FCallA (FCall n (reverse es))) : ts) q
+sr (RPar : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
 -- Function definition
-sr (NSym n:LPar: s) q = sr (Params []: NSym:s) q 
-sr (Comma:PA v: Params vs:s ) q = (Params ((v,-9999):vs):s) q
-sr(RPar : PA v: Params vs : s) q = (RPar:Params (v:vs):s) q
-sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = sr (FunDefT (FunDef n ps (reverse is)) : ts) q
+sr (NSym n:LPar: s) q = sr (Params []: (NSym n):s) q 
+sr (Comma: Param v: Params vs:s ) q = sr (Params (v:vs) : s) q
+sr(RPar : Param v: Params vs : s) q = sr (RPar:Params (v:vs):s) q
+sr (RBra : Block is : LBra : Params ps : NSym n : ts) q = let defaultV = -999 :: Value in
+    sr (FunDefT (FunDef n (map (zip ps defaultV)) (reverse is)) : ts) q
 --Block
 sr (LBra: ts) q = sr (Block []: ts) q
 sr (Semi : PI i : Block is : ts) q = sr (Block (i:is) : ts) q
