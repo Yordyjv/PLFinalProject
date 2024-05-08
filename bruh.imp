@@ -1,6 +1,6 @@
 Bruh(x){
     x:=(x*x);
     return x;
-}
+} 
 
 Bruh[5];

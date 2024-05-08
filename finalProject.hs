@@ -1,6 +1,7 @@
 import Data.Char
 import Language.Haskell.TH (safe)
 import Control.Monad.RWS (MonadState(put))
+import Data.Maybe (fromMaybe)
 --Worked with Kevin Portillo
 --Funtions are always Camel Case
 --fucntion defintions start with fname (params sep by commas)
@@ -35,7 +36,7 @@ data Instr = Assign Vars AExpr -- assignment
     | Nop -- the "do nothing" instruction
     | FAssign FunDef
     | Return AExpr -- the final value to return
-    | FCall FName [Value]
+    | FCall FName [Either VName Value] 
     deriving Show
 
 
@@ -57,7 +58,7 @@ data Token = VSym String | CSym Integer | BSym Bool
     | Err String
     | LSqu | RSqu
     | PA AExpr | PB BExpr | PI Instr | Block [Instr] | Input Value | Param VName
-    | Params [VName] | Inputs[Value]
+    | Params [VName] | Inputs[Either VName Value] --inputs that are straight constants
     | FunDefT FunDef
     deriving Show
 
@@ -72,8 +73,6 @@ type FEnv = [FunDef] -- fundefs
 
 type Env = (VEnv, FEnv) --class enviorments
 
---type ClassName = String 
---type Object = [(ClassName, Class)] 
 
 
 data FunDef = FunDef { fname :: FName 
@@ -81,13 +80,21 @@ data FunDef = FunDef { fname :: FName
                         , body :: [Instr]  }
                         deriving Show
 
+--for full OOP functionallity we would ddefine  the following
+{-
+a record ttpe for methods. which would have a visiablity type attched
+a type visiablity with public or private
+--class with a name, venv, and methods
+we then would want a CENV
+and and ENV to be (Venv, Fenv, Cenv)
+-}
+
 -- Fun def has params and body. 
 -- Params have a value and a name, VEnv
 --
 --FunDef is function definition. Value is values to be put in original params
 
---evalFunDef :: FunDef -> [Value] -> Either AExpr BExpr
---evalFunDef = 
+
 
 
 
@@ -152,16 +159,20 @@ execList :: [Instr] -> Env -> Env
 execList instrs env = foldl (\e i -> exec i e) env instrs
 
 
-
-setParms :: FName -> [Value] -> Env -> Env
-setParms fn vs env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
+setParms :: FName -> [Either VName Value] -> Env -> Env
+setParms fn evs env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
     Just fundef -> 
         let varnames = map fst (params fundef)
-            newparams = zip varnames vs
+            resolvedVs = map (resolveArg env) evs
+            newparams = zip varnames resolvedVs
             newFundef = fundef { params = newparams }
             newFenv = map (\f -> if fname f == fn then newFundef else f) fenv
         in (venv, newFenv)
     Nothing -> env
+
+resolveArg :: Env -> Either VName Value -> Value
+resolveArg env (Left v) = fromMaybe (error $ "Undefined variable: " ++ v) (lookup v (fst env))
+resolveArg _ (Right val) = val
 
 callFun :: FName -> Env -> Env
 callFun fn env@(venv, fenv) = case lookup fn [(fname f, f) | f <- fenv] of
@@ -267,7 +278,7 @@ sr (PA e2 : BOp SubOp : PA e1 : ts) i = sr (PA (Sub e1 e2) : ts) i
 sr (PA e2 : BOp MulOp : PA e1 : ts) i = sr (PA (Mul e1 e2) : ts) i  
 sr (PA e2 : BOp DivOp : PA e1 : ts) i = sr (PA (Div e1 e2) : ts) i   
     --Assign
-sr (PA e : AssignOp : PA (Var v) : ts) q = sr (PI (Assign v e) : ts) q  
+sr (PA e : AssignOp : PA (Var v) : ts) q = sr ( PI (Assign v e) : ts) q 
 
     --IfThenElse
 sr (PI i2 : Keyword ElseK :Semi :PI i1 : Keyword ThenK : PB b : Keyword IfK : ts ) q
@@ -278,35 +289,33 @@ sr (Keyword NopK : ts) q = sr (PI (Nop) : ts) q
 -----------------
 
 sr (RSqu : Inputs es : NSym n : ts) q = sr (PI (FCall n (reverse es)) : ts) q
-
+--get the input varibales or constants for the function
 sr (LSqu: s) q = sr (Inputs [] : s) q 
-sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (c:es):s) q
-sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (c:es): s) q --HERE
-
-
+sr(Comma : PA (Const c) : Inputs es: s) q = sr (Inputs (Right c:es):s) q
+sr(Comma : PA (Var v) : Inputs es: s) q = sr (Inputs (Left v:es):s) q
+sr(RSqu: PA (Const c) : Inputs es:s ) q = sr (RSqu : Inputs (Right c:es): s) q 
+sr(RSqu: PA (Var v) : Inputs es:s ) q = sr (RSqu : Inputs (Left v:es): s) q 
 
 sr (LPar : NSym n:  s) q = sr (Params []: LPar : NSym n : s) q 
 sr (Comma: PA (Var v): Params vs:s ) q = sr (Params (v:vs) : s) q
 sr (RPar : PA (Var v): Params vs : s) q = sr (RPar:Params (v:vs):s) q
-
 
 --Block
 sr (LBra : PI i : ts)            q = sr (Block [i] : LBra : ts) q --Left bracket, start block with next instruction
 sr (RBra : Semi:  PI i : ts) q = sr (Block [i] : ts) q -- RBra then Semi then instruction, means the bloc
 sr (Block is : Semi : PI i : ts) q = sr (Block (i:is) : ts) q
 sr (Block is : LBra : ts)        q = sr (PI (Do is) : ts)   q
-
+--- while and return
 sr (PI i : PB b : Keyword WhileK : ts) q = sr (PI (While b i) : ts) q
 sr (PA e :Keyword ReturnK : ts) q = sr (PI (Return e) : ts) q
--- Function call
+-- Function defintion
 sr (PI (Do is) : RPar: Params ps : LPar : NSym n : ts) q = let defaultV = -999 :: Value in
     sr (PI (FAssign (FunDef n (reverse (zip ps (repeat defaultV))) (is))) : ts) q
--- Function definition
-
 --Syntax
 sr (RPar : PI e : LPar : s) q = sr (PI e : s) q --parenthesis
 sr (RPar : PA e : LPar : s) q = sr (PA e : s) q --parenthesis
 sr (RPar : PB e : LPar : s) q = sr (PB e : s) q --parenthesis
+
 --shift 
 sr s (i:q) = sr (i:s) q 
 --exit 
@@ -317,9 +326,11 @@ sr s [] = blocker s (Block [] : [])
 
 
 blocker :: [Token] -> [Token] -> [Token]
+--makes sure list is only semis and PI's then puts it in a block
 blocker [] x = x
 blocker (x:xs) (Block(i):[]) = case x of 
     RBra -> blocker xs (Block(i):[])
+    Semi -> blocker xs (Block(i):[])
     PI x -> blocker xs (Block(x:i):[])
     unexpected -> [Err$ "Block Error" ++ show unexpected ++ " in " ++ show (x:xs)]
 
@@ -429,11 +440,14 @@ instructions =
                                 , Return (Var "x")
                                 ]
                        }
-    , FCall "bruh" [5]
+    , FCall "bruh" [Right 5]
     ]
 
 testLexFun :: String
 testLexFun = "Bruh(x){ x:=(x*2); return x; } Bruh[5];"
+
+testLex2 :: String
+testLex2 = "Bruh(x, d,y){if (x <= d) then d:=x; else while (d < x) {d:=(d+x); x:=(x+4); d:=(d-y);}; return d;} z:=17; q:=3; r:=1; Bruh[z,q,r];"
 
 test = parse (lexer testLexFun)
 

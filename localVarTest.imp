@@ -1,5 +1,4 @@
 
-
 Bruh(x, d,y){
 if (x <= d)
     then d:=x;
@@ -10,7 +9,9 @@ if (x <= d)
     } ; 
 return d;
 }
-x:=17;
-d:=3;
-y:=1;
-Bruh[x,d,y];
+
+z:=17;
+q:=3;
+r:=1;
+
+Bruh[z,q,r];
